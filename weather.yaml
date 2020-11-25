@@ -1,0 +1,149 @@
+substitutions:
+  node_name: weather
+  device_verbose_name: "Weather Station"
+  node_platform: ESP8266
+  node_board: nodemcuv2
+  log_level: INFO
+  
+esphome:
+  includes: 
+    - veml6070_custom_sensor.h
+
+  libraries:
+    - "https://github.com/adafruit/Adafruit_VEML6070"
+    - "https://github.com/adafruit/Adafruit_BusIO"
+
+packages:
+  wifi: !include common/wifi.yaml
+  device_base: !include common/device_base.yaml
+
+wifi: 
+  manual_ip:
+    static_ip: 192.168.0.116
+    gateway: 192.168.0.1
+    subnet: 255.255.255.0
+    dns1: 8.8.8.8
+    dns2: 77.88.8.8
+  
+http_request:
+
+i2c:
+  scl: 5
+  sda: 4
+  scan: false
+  
+dallas:
+  - pin: 13
+#    update_interval: 30s
+
+# Датчики
+sensor:
+  - platform: bh1750
+    name: "Outside illuminance"
+    id: illuminance
+    address: 0x23
+    filters: median
+    force_update: true
+
+  - platform: bme280
+    temperature:
+      name: "Outside temperature"
+      id: temperature
+      unit_of_measurement: "°C"
+      filters: 
+        - median
+        - calibrate_linear:
+            - -1.65 -> 0.0
+            - -5.7 -> -4.0
+            - -10.0 -> -8.31
+            - -15.02 -> -13.38
+            - -20.12 -> -18.25
+            - -25.1 -> -23.13
+      oversampling: 16x
+    pressure:
+      name: "Outside pressure"
+      id: pressure
+      unit_of_measurement: "mmHg"
+      oversampling: 16x
+      filters:
+        - lambda: return (x / 133.3224) * 100;
+        - median:
+            window_size: 7
+            send_every: 4
+            send_first_at: 3
+      accuracy_decimals: 1
+    humidity:
+      name: "Outside humidity"
+      id: humidity
+      unit_of_measurement: "%"
+      oversampling: 16x
+    address: 0x76
+    update_interval: 60s
+
+  - platform: custom
+    lambda: |-
+      auto veml6070 = new VEML6070CustomSensor();
+      App.register_component(veml6070);
+      return {veml6070};
+    sensors:
+      name: "Outside ultraviolet sensor"
+      id: ultraviolet
+      force_update: true
+
+  - platform: dallas
+    address: 0xF93C01B556FE6828
+    name: "Outside temperature dallas"
+    id: temperature_dallas
+
+# narodmon.ru отпаравка данных
+interval:
+  - interval: 2min
+    then:
+      http_request.post:
+        url: http://narodmon.ru/post
+        json: |-
+          JsonObject &device = root.createNestedArray("devices").createNestedObject();
+          device["mac"] = "XX:XX:XX:XX:XX:XX";
+          device["name"] = "Weather Station xxxxxxxx";
+          device["owner"] = "xxxxxxx@live.ru";
+          device["lat"] = "xx.xxxxxx";
+          device["lon"] = "xx.xxxxxx";
+          JsonArray &sensors = device.createNestedArray("sensors");
+          JsonObject &temp = sensors.createNestedObject();
+          temp["id"] = "temperature";
+          temp["value"] = id(temperature).state;
+          temp["unit"] = "C";
+          temp["name"] = "Температура BME280";
+          JsonObject &tempdallas = sensors.createNestedObject();
+          tempdallas["id"] = "dallas";
+          tempdallas["value"] = id(temperature_dallas).state;
+          tempdallas["unit"] = "C";
+          tempdallas["name"] = "Температура Dallas";
+          JsonObject &hum = sensors.createNestedObject();
+          hum["id"] = "humidity";
+          hum["value"] = id(humidity).state;
+          hum["unit"] = "%";
+          hum["name"] = "Влажность BME280";
+          JsonObject &press = sensors.createNestedObject();
+          press["id"] = "pressure";
+          press["value"] = id(pressure).state;
+          press["unit"] = "mmHg";
+          press["name"] = "Давление BME280";
+          JsonObject &uv = sensors.createNestedObject();
+          uv["id"] = "uv";
+          uv["value"] = id(ultraviolet).state;
+          uv["name"] = "УФ индекс VEML6070";
+          JsonObject &lum = sensors.createNestedObject();
+          lum["id"] = "illuminance";
+          lum["value"] = id(illuminance).state;
+          press["unit"] = "lx";
+          lum["name"] = "Датчик освещенности BH1750";
+          JsonObject &upt = sensors.createNestedObject();
+          upt["id"] = "uptime";
+          upt["value"] = id(up_time).state;
+          upt["name"] = "Время работы Weather";
+          JsonObject &wfs = sensors.createNestedObject();
+          wfs["id"] = "wifi";
+          wfs["value"] = id(wifi_sig).state;
+          wfs["unit"] = "dB";
+          wfs["name"] = "Wi-Fi сигнал Weather";
