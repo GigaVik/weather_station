@@ -1,8 +1,8 @@
 substitutions:
-  node_name: weather
-  device_verbose_name: "Weather Station"
+  node_name: weather_wemos
+  device_verbose_name: "Weather Station Wemos"
   node_platform: ESP8266
-  node_board: nodemcuv2
+  node_board: d1_mini_pro
   log_level: INFO
   
 esphome:
@@ -21,7 +21,7 @@ wifi:
   manual_ip:
     static_ip: 192.168.0.116
     gateway: 192.168.0.1
-    subnet: 255.255.255.0
+    subnet: 255.255.255.0 
     dns1: 8.8.8.8
     dns2: 77.88.8.8
   
@@ -105,7 +105,7 @@ interval:
           JsonObject &device = root.createNestedArray("devices").createNestedObject();
           device["mac"] = "XX:XX:XX:XX:XX:XX";
           device["name"] = "Weather Station xxxxxxxx";
-          device["owner"] = "xxxxxxx@live.ru";
+          device["owner"] = "xxxxxxx@xxxx.ru";
           device["lat"] = "xx.xxxxxx";
           device["lon"] = "xx.xxxxxx";
           JsonArray &sensors = device.createNestedArray("sensors");
